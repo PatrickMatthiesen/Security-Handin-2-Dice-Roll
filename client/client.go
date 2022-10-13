@@ -3,12 +3,14 @@ package main
 import (
 	// "crypto/tls"
 	"context"
-	"flag"
-	"fmt"
-	"log"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"flag"
+	"fmt"
+	"log"
+
+	// "encoding/pem"
 	"os"
 
 	gRPC "github.com/PatrickMatthiesen/DiceRoll/proto"
@@ -43,29 +45,6 @@ func main() {
 
 // connect to server
 func ConnectToServer() {
-	// rootPEM, err := os.ReadFile("keys/cointoss.pem")
-	// if err != nil {
-	// 	log.Fatalf("failed to read cert.pem: %s", err)
-	// }
-	
-	// certPool := x509.NewCertPool()
-	// ok := certPool.AppendCertsFromPEM(rootPEM)
-	// if !ok {
-	// 	panic("failed to parse root certificate")
-	// }
-
-	// cert, err := tls.LoadX509KeyPair("keys/cointoss.pem", "keys/cointoss.key")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	// cfg := &tls.Config{
-	// 	RootCAs: certPool,
-	// 	Certificates: []tls.Certificate{cert},
-	// }
-
-	// creds, _ := credentials.NewClientTLSFromFile("keys/client-cert.pem", "example.org")
-
 	creds := credentials.NewTLS(getTLSConfig())
 
 	log.Printf("client %s: Attempts to dial on port %s\n", *clientsName, *serverPort)
@@ -95,14 +74,14 @@ func ConnectToServer() {
 
 
 func getTLSConfig() *tls.Config {
-    certPool := x509.NewCertPool()
-    certs := []tls.Certificate{}
-
 	// Read certificate files
-	srvPemBytes, err := os.ReadFile(fmt.Sprintf("keys/%v.cert.pem", "bob"))
+	srvPemBytes, err := os.ReadFile("keys/bob.cert.pem")
 	if err != nil {
 		log.Fatalf("%v\n", err)
 	}
+	
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(srvPemBytes)
 
 	// Decode and parse certs
 	srvPemBlock, _ := pem.Decode(srvPemBytes)
@@ -117,17 +96,9 @@ func getTLSConfig() *tls.Config {
 	clientCert.KeyUsage = x509.KeyUsageCertSign
 	certPool.AppendCertsFromPEM(srvPemBytes)
 
-	// Load server certificates (essentially the same as the client certs)
-	srvCert, err := tls.LoadX509KeyPair(fmt.Sprintf("keys/%v.cert.pem", "bob"), fmt.Sprintf("keys/%v.key.pem", "bob"))
-	if err != nil {
-		log.Fatalf("%v\n", err)
-	}
-	certs = append(certs, srvCert)
-
     return &tls.Config{
-        Certificates: certs, // Server certs
-        ClientAuth:   tls.RequireAndVerifyClientCert,
-        ClientCAs:    certPool,
+		Certificates: []tls.Certificate{clientCert},
         RootCAs:      certPool,
+		ClientCAs:    certPool,
     }
 }

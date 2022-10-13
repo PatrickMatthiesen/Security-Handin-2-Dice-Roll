@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/pem"
 	"flag"
 	"fmt"
 	"log"
@@ -75,26 +74,13 @@ func (s *Server) CommitRoll(cxt context.Context, req *gRPC.Commitment) (*gRPC.Co
 
 
 func getTLSConfig() *tls.Config {
-    certPool := x509.NewCertPool()
-    certs := []tls.Certificate{}
-
 	// Read certificate files
 	srvPemBytes, err := os.ReadFile("keys/bob.cert.pem")
 	if err != nil {
 		log.Fatalf("%v\n", err)
 	}
-
-	// Decode and parse certs
-	srvPemBlock, _ := pem.Decode(srvPemBytes)
-	clientCert, err := x509.ParseCertificate(srvPemBlock.Bytes)
-	if err != nil {
-		log.Fatalf("%v\n", err)
-	}
-
-	// Enforce client authentication and allow self-signed certs
-	clientCert.BasicConstraintsValid = true
-	clientCert.IsCA = true
-	clientCert.KeyUsage = x509.KeyUsageCertSign
+	
+	certPool := x509.NewCertPool()
 	certPool.AppendCertsFromPEM(srvPemBytes)
 
 	// Load server certificates (essentially the same as the client certs)
@@ -102,12 +88,11 @@ func getTLSConfig() *tls.Config {
 	if err != nil {
 		log.Fatalf("%v\n", err)
 	}
-	certs = append(certs, srvCert)
 
     return &tls.Config{
-        Certificates: certs, // Server certs
-        ClientAuth:   tls.RequireAndVerifyClientCert,
+        Certificates: []tls.Certificate{srvCert}, // Server certs
+        ClientAuth:   tls.RequireAndVerifyClientCert, // Require and verify client certs
         ClientCAs:    certPool,
-        RootCAs:      certPool,
+		RootCAs: 	  certPool,
     }
 }

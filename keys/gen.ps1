@@ -16,7 +16,8 @@
 # openssl req -new -x509 -days 365 -nodes -out server-cert.pem -keyout server-key.pem -subj "/C=DK/ST=Denmark/O=ITU/CN=example.org/emailAddress=server@itu.dk"
 # openssl req -new -x509 -days 365 -nodes -out client-cert.pem -keyout client-key.pem -subj "/C=DK/ST=Denmark/O=ITU/CN=example.org/emailAddress=server@itu.dk"
 
-# $name = "alice"
-# openssl req -x509 -newkey rsa:4096 -keyout "$name.key.pem" -out "$name.cert.pem" -sha256 -days 365 -nodes -subj "/CN=$name" -addext "subjectAltName = DNS:localhost,DNS:$name"
+$name = "alice"
+openssl req -x509 -newkey rsa:4096 -keyout "$name.key.pem" -out "$name.cert.pem" -sha256 -days 365 -nodes -addext "subjectAltName = DNS:localhost,DNS:$name"
 $name = "bob"
-openssl req -x509 -newkey rsa:4096 -keyout "$name.key.pem" -out "$name.cert.pem" -sha256 -days 365 -nodes -subj "/CN=$name" -addext "subjectAltName = DNS:localhost,DNS:$name"
+openssl req -x509 -newkey rsa:4096 -keyout "$name.key.pem" -out "$name.cert.pem" -sha256 -days 365 -nodes -addext "subjectAltName = DNS:localhost,DNS:$name"
+
