@@ -74,25 +74,24 @@ func (s *Server) CommitRoll(cxt context.Context, req *gRPC.Commitment) (*gRPC.Co
 
 
 func getTLSConfig() *tls.Config {
-	// Read certificate files
-	srvPemBytes, err := os.ReadFile("keys/bob.cert.pem")
+	cert, err := tls.LoadX509KeyPair("server_cert.pem", "server_key.pem")
 	if err != nil {
-		log.Fatalf("%v\n", err)
-	}
-	
-	certPool := x509.NewCertPool()
-	certPool.AppendCertsFromPEM(srvPemBytes)
-
-	// Load server certificates (essentially the same as the client certs)
-	srvCert, err := tls.LoadX509KeyPair("keys/bob.cert.pem", "keys/bob.key.pem")
-	if err != nil {
-		log.Fatalf("%v\n", err)
+		log.Fatalf("failed to load key pair: %s", err)
 	}
 
-    return &tls.Config{
-        Certificates: []tls.Certificate{srvCert}, // Server certs
-        ClientAuth:   tls.RequireAndVerifyClientCert, // Require and verify client certs
-        ClientCAs:    certPool,
-		RootCAs: 	  certPool,
-    }
+	ca := x509.NewCertPool()
+	caFilePath := "client_ca_cert.pem"
+	caBytes, err := os.ReadFile(caFilePath)
+	if err != nil {
+		log.Fatalf("failed to read ca cert %q: %v", caFilePath, err)
+	}
+	if ok := ca.AppendCertsFromPEM(caBytes); !ok {
+		log.Fatalf("failed to parse %q", caFilePath)
+	}
+
+	return &tls.Config{
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		Certificates: []tls.Certificate{cert},
+		ClientCAs:    ca,
+	}
 }

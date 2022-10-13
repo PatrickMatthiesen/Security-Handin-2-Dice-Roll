@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/pem"
 	"flag"
 	"fmt"
 	"log"
@@ -74,31 +73,24 @@ func ConnectToServer() {
 
 
 func getTLSConfig() *tls.Config {
-	// Read certificate files
-	srvPemBytes, err := os.ReadFile("keys/bob.cert.pem")
+	cert, err := tls.LoadX509KeyPair("client_cert.pem", "client_key.pem")
 	if err != nil {
-		log.Fatalf("%v\n", err)
-	}
-	
-	certPool := x509.NewCertPool()
-	certPool.AppendCertsFromPEM(srvPemBytes)
-
-	// Decode and parse certs
-	srvPemBlock, _ := pem.Decode(srvPemBytes)
-	clientCert, err := x509.ParseCertificate(srvPemBlock.Bytes)
-	if err != nil {
-		log.Fatalf("%v\n", err)
+		log.Fatalf("failed to load client cert: %v", err)
 	}
 
-	// Enforce client authentication and allow self-signed certs
-	clientCert.BasicConstraintsValid = true
-	clientCert.IsCA = true
-	clientCert.KeyUsage = x509.KeyUsageCertSign
-	certPool.AppendCertsFromPEM(srvPemBytes)
+	ca := x509.NewCertPool()
+	caFilePath := "ca_cert.pem"
+	caBytes, err := os.ReadFile(caFilePath)
+	if err != nil {
+		log.Fatalf("failed to read ca cert %q: %v", caFilePath, err)
+	}
+	if ok := ca.AppendCertsFromPEM(caBytes); !ok {
+		log.Fatalf("failed to parse %q", caFilePath)
+	}
 
-    return &tls.Config{
-		Certificates: []tls.Certificate{clientCert},
-        RootCAs:      certPool,
-		ClientCAs:    certPool,
-    }
+	return &tls.Config{
+		ServerName:   "x.test.example.com",
+		Certificates: []tls.Certificate{cert},
+		RootCAs:      ca,
+	}
 }
