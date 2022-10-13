@@ -35,7 +35,6 @@ func main() {
 	//setLog()
 
 	//connect to server and close the connection when program closes
-	fmt.Println("--- join Server ---")
 	ConnectToServer()
 	defer ServerConn.Close()
 
@@ -73,13 +72,13 @@ func ConnectToServer() {
 
 
 func getTLSConfig() *tls.Config {
-	cert, err := tls.LoadX509KeyPair("client_cert.pem", "client_key.pem")
+	cert, err := tls.LoadX509KeyPair("keys/client_cert.pem", "keys/client_key.pem")
 	if err != nil {
 		log.Fatalf("failed to load client cert: %v", err)
 	}
 
 	ca := x509.NewCertPool()
-	caFilePath := "ca_cert.pem"
+	caFilePath := "keys/ca_cert.pem"
 	caBytes, err := os.ReadFile(caFilePath)
 	if err != nil {
 		log.Fatalf("failed to read ca cert %q: %v", caFilePath, err)

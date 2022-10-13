@@ -20,22 +20,20 @@ import (
 
 type Server struct {
 	gRPC.UnimplementedDiceRollServiceServer        // You need this line if you have a server
-	name                             string // Not required but useful if you want to name your server
-	port                             string // Not required but useful if your server needs to know what port it's listening to
+	name                                    string // Not required but useful if you want to name your server
+	port                                    string // Not required but useful if your server needs to know what port it's listening to
 
-	randomA int32
+	randomA    int32
 	commitment int32
 }
 
 // flags are used to get arguments from the terminal. Flags take a value, a default value and a description of the flag.
 // to use a flag then just add it as an argument when running the program.
-var port = flag.String("port", "5400", "Server port")           // set with "-port <port>" in terminal
-
-
+var port = flag.String("port", "5400", "Server port") // set with "-port <port>" in terminal
 
 func main() {
 	flag.Parse()
-	fmt.Println(".:Bob is waking up:.")
+	fmt.Println("--- Bob is waking up ---")
 	log.Printf("Bob attempts to create listener on port %s\n", *port)
 
 	// creds, _ := credentials.NewServerTLSFromFile("keys/server-cert.pem", "keys/server-key.pem")
@@ -44,16 +42,16 @@ func main() {
 
 	grpcServer := grpc.NewServer(grpc.Creds(creds))
 
-    list, err := net.Listen("tcp", "localhost:5400")
-    if err != nil {
-        log.Fatalf("failed to listen: %v", err)
-    }
+	list, err := net.Listen("tcp", "localhost:5400")
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
 
 	server := &Server{
-		port:           *port,
-		name:           "Bob",
-		randomA: 	  		0,
-		commitment: 	  	0,
+		port:       *port,
+		name:       "Bob",
+		randomA:    0,
+		commitment: 0,
 	}
 
 	gRPC.RegisterDiceRollServiceServer(grpcServer, server) //Registers the server to the gRPC server.
@@ -69,18 +67,17 @@ func main() {
 func (s *Server) CommitRoll(cxt context.Context, req *gRPC.Commitment) (*gRPC.CommitmentResponse, error) {
 	log.Printf("Bob: Received commitment from Alice: %d\n", req.GetCommitment())
 	s.commitment = req.GetCommitment()
-	return &gRPC.CommitmentResponse{ Random: 2}, nil
+	return &gRPC.CommitmentResponse{Random: 2}, nil
 }
 
-
 func getTLSConfig() *tls.Config {
-	cert, err := tls.LoadX509KeyPair("server_cert.pem", "server_key.pem")
+	cert, err := tls.LoadX509KeyPair("keys/server_cert.pem", "keys/server_key.pem")
 	if err != nil {
 		log.Fatalf("failed to load key pair: %s", err)
 	}
 
 	ca := x509.NewCertPool()
-	caFilePath := "client_ca_cert.pem"
+	caFilePath := "keys/client_ca_cert.pem"
 	caBytes, err := os.ReadFile(caFilePath)
 	if err != nil {
 		log.Fatalf("failed to read ca cert %q: %v", caFilePath, err)

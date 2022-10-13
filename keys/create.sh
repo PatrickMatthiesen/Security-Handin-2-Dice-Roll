@@ -1,4 +1,5 @@
 #!/bin/bash
+# use "bash create.sh" to run this script
 
 # Create the server CA certs.
 openssl req -x509                                     \
@@ -67,3 +68,5 @@ openssl x509 -req           \
 openssl verify -verbose -CAfile client_ca_cert.pem  client_cert.pem
 
 rm *_csr.pem
+rm ca_key.pem
+rm client_ca_key.pem
