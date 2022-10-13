@@ -3,18 +3,18 @@ package main
 import (
 	// "crypto/tls"
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"flag"
 	"fmt"
 	"log"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"os"
 
 	gRPC "github.com/PatrickMatthiesen/DiceRoll/proto"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	// "google.golang.org/grpc/credentials/insecure"
 )
 
 // Same principle as in client. Flags allows for user specific arguments/values
@@ -43,45 +43,40 @@ func main() {
 
 // connect to server
 func ConnectToServer() {
-	rootPEM, err := os.ReadFile("keys/cointoss.pem")
-	if err != nil {
-		log.Fatalf("failed to read cert.pem: %s", err)
-	}
+	// rootPEM, err := os.ReadFile("keys/cointoss.pem")
+	// if err != nil {
+	// 	log.Fatalf("failed to read cert.pem: %s", err)
+	// }
 	
-	certPool := x509.NewCertPool()
-	ok := certPool.AppendCertsFromPEM(rootPEM)
-	if !ok {
-		panic("failed to parse root certificate")
-	}
+	// certPool := x509.NewCertPool()
+	// ok := certPool.AppendCertsFromPEM(rootPEM)
+	// if !ok {
+	// 	panic("failed to parse root certificate")
+	// }
 
-	cert, err := tls.LoadX509KeyPair("keys/cointoss.pem", "keys/cointoss.key")
-	if err != nil {
-		log.Fatal(err)
-	}
+	// cert, err := tls.LoadX509KeyPair("keys/cointoss.pem", "keys/cointoss.key")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
-	cfg := &tls.Config{
-		RootCAs: certPool,
-		Certificates: []tls.Certificate{cert},
-	}
+	// cfg := &tls.Config{
+	// 	RootCAs: certPool,
+	// 	Certificates: []tls.Certificate{cert},
+	// }
+
+	// creds, _ := credentials.NewClientTLSFromFile("keys/client-cert.pem", "example.org")
+
+	creds := credentials.NewTLS(getTLSConfig())
 
 	log.Printf("client %s: Attempts to dial on port %s\n", *clientsName, *serverPort)
     conn, err := grpc.Dial("localhost:5400",
-        grpc.WithTransportCredentials(credentials.NewTLS(cfg)),
+        grpc.WithTransportCredentials(creds),
 		grpc.WithBlock(),
     )
 	if err != nil {
         log.Fatalf("did not connect: %v", err)
     }
     defer conn.Close()
-
-	// var opts []grpc.DialOption
-	// opts = append(opts, grpc.WithBlock(), grpc.WithTransportCredentials(credentials.NewTLS(cfg)))
-	// //dial the server, with the flag "server", to get a connection to it
-	// conn, err := grpc.Dial(fmt.Sprintf(":%s", *serverPort), opts...)
-	// if err != nil {
-	// 	log.Printf("Fail to Dial : %v", err)
-	// 	return
-	// }
 
 	log.Println("client: Dialing successful")
 
@@ -96,4 +91,43 @@ func ConnectToServer() {
 		log.Fatalf("could not greet: %v", err)
 	}
 	log.Println(responce)
+}
+
+
+func getTLSConfig() *tls.Config {
+    certPool := x509.NewCertPool()
+    certs := []tls.Certificate{}
+
+	// Read certificate files
+	srvPemBytes, err := os.ReadFile(fmt.Sprintf("keys/%v.cert.pem", "bob"))
+	if err != nil {
+		log.Fatalf("%v\n", err)
+	}
+
+	// Decode and parse certs
+	srvPemBlock, _ := pem.Decode(srvPemBytes)
+	clientCert, err := x509.ParseCertificate(srvPemBlock.Bytes)
+	if err != nil {
+		log.Fatalf("%v\n", err)
+	}
+
+	// Enforce client authentication and allow self-signed certs
+	clientCert.BasicConstraintsValid = true
+	clientCert.IsCA = true
+	clientCert.KeyUsage = x509.KeyUsageCertSign
+	certPool.AppendCertsFromPEM(srvPemBytes)
+
+	// Load server certificates (essentially the same as the client certs)
+	srvCert, err := tls.LoadX509KeyPair(fmt.Sprintf("keys/%v.cert.pem", "bob"), fmt.Sprintf("keys/%v.key.pem", "bob"))
+	if err != nil {
+		log.Fatalf("%v\n", err)
+	}
+	certs = append(certs, srvCert)
+
+    return &tls.Config{
+        Certificates: certs, // Server certs
+        ClientAuth:   tls.RequireAndVerifyClientCert,
+        ClientCAs:    certPool,
+        RootCAs:      certPool,
+    }
 }

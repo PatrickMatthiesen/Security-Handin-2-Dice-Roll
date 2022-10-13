@@ -1,16 +1,15 @@
 package main
 
 import (
-	// "crypto/tls"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"flag"
 	"fmt"
 	"log"
 	"net"
-
-	// "net"
-
-	"go.step.sm/crypto/tlsutil"
+	"os"
 
 	// this has to be the same as the go.mod module,
 	// followed by the path to the folder the proto file is in.
@@ -40,34 +39,22 @@ func main() {
 	fmt.Println(".:Bob is waking up:.")
 	log.Printf("Bob attempts to create listener on port %s\n", *port)
 
-	c, err := tlsutil.NewServerCredentialsFromFile("keys/cointoss.pem", "keys/cointoss.key")
-    if err != nil {
-        log.Fatal("error creating server credentials: ", err)
-    }
+	// creds, _ := credentials.NewServerTLSFromFile("keys/server-cert.pem", "keys/server-key.pem")
 
-    opts := []grpc.ServerOption{
-        grpc.Creds(credentials.NewTLS(c.TLSConfig())),
-    }
+	creds := credentials.NewTLS(getTLSConfig())
+
+	grpcServer := grpc.NewServer(grpc.Creds(creds))
 
     list, err := net.Listen("tcp", "localhost:5400")
     if err != nil {
         log.Fatalf("failed to listen: %v", err)
     }
 
-	// cert, err := tls.LoadX509KeyPair("keys/cointoss.pem", "keys/cointoss.key")
-    // if err != nil {
-    //     log.Fatal(err)
-    // }
-
-	// makes gRPC server using the options
-	// you can add options here if you want or remove the options part entirely
-	// opts := []grpc.ServerOption {
-	// 	grpc.Creds(credentials.NewServerTLSFromCert(&cert)),
-	// }
-	grpcServer := grpc.NewServer(opts...)
-
 	server := &Server{
 		port:           *port,
+		name:           "Bob",
+		randomA: 	  		0,
+		commitment: 	  	0,
 	}
 
 	gRPC.RegisterDiceRollServiceServer(grpcServer, server) //Registers the server to the gRPC server.
@@ -84,4 +71,43 @@ func (s *Server) CommitRoll(cxt context.Context, req *gRPC.Commitment) (*gRPC.Co
 	log.Printf("Bob: Received commitment from Alice: %d\n", req.GetCommitment())
 	s.commitment = req.GetCommitment()
 	return &gRPC.CommitmentResponse{ Random: 2}, nil
+}
+
+
+func getTLSConfig() *tls.Config {
+    certPool := x509.NewCertPool()
+    certs := []tls.Certificate{}
+
+	// Read certificate files
+	srvPemBytes, err := os.ReadFile("keys/bob.cert.pem")
+	if err != nil {
+		log.Fatalf("%v\n", err)
+	}
+
+	// Decode and parse certs
+	srvPemBlock, _ := pem.Decode(srvPemBytes)
+	clientCert, err := x509.ParseCertificate(srvPemBlock.Bytes)
+	if err != nil {
+		log.Fatalf("%v\n", err)
+	}
+
+	// Enforce client authentication and allow self-signed certs
+	clientCert.BasicConstraintsValid = true
+	clientCert.IsCA = true
+	clientCert.KeyUsage = x509.KeyUsageCertSign
+	certPool.AppendCertsFromPEM(srvPemBytes)
+
+	// Load server certificates (essentially the same as the client certs)
+	srvCert, err := tls.LoadX509KeyPair("keys/bob.cert.pem", "keys/bob.key.pem")
+	if err != nil {
+		log.Fatalf("%v\n", err)
+	}
+	certs = append(certs, srvCert)
+
+    return &tls.Config{
+        Certificates: certs, // Server certs
+        ClientAuth:   tls.RequireAndVerifyClientCert,
+        ClientCAs:    certPool,
+        RootCAs:      certPool,
+    }
 }
