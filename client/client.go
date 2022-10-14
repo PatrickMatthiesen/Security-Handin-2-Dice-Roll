@@ -3,16 +3,16 @@ package main
 import (
 	// "crypto/tls"
 	"context"
-	"crypto/tls"
-	"crypto/x509"
+	"crypto/sha1"
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 
 	// "encoding/pem"
-	"os"
 
 	gRPC "github.com/PatrickMatthiesen/DiceRoll/proto"
+	"github.com/PatrickMatthiesen/DiceRoll/util"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -22,8 +22,7 @@ import (
 var clientsName = flag.String("name", "default", "Senders name")
 var serverPort = flag.String("server", "5400", "Tcp server")
 
-var server gRPC.DiceRollServiceClient  //the server
-var ServerConn *grpc.ClientConn //the server connection
+var server gRPC.DiceRollServiceClient //the server
 
 func main() {
 	//parse flag/arguments
@@ -36,60 +35,69 @@ func main() {
 
 	//connect to server and close the connection when program closes
 	ConnectToServer()
-	defer ServerConn.Close()
 
 	//start the biding
 }
 
 // connect to server
 func ConnectToServer() {
-	creds := credentials.NewTLS(getTLSConfig())
+	creds := credentials.NewTLS(util.GetClientTLSConfig())
 
 	log.Printf("client %s: Attempts to dial on port %s\n", *clientsName, *serverPort)
-    conn, err := grpc.Dial("localhost:5400",
-        grpc.WithTransportCredentials(creds),
+	conn, err := grpc.Dial("localhost:5400",
+		grpc.WithTransportCredentials(creds),
 		grpc.WithBlock(),
-    )
+	)
 	if err != nil {
-        log.Fatalf("did not connect: %v", err)
-    }
-    defer conn.Close()
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
 
-	log.Println("client: Dialing successful")
-
-	// makes a client from the server connection and saves the connection
-	// and prints rather or not the connection was is READY
 	server = gRPC.NewDiceRollServiceClient(conn)
-	ServerConn = conn
 	log.Println("the connection is: ", conn.GetState().String())
 
-	responce, err := server.CommitRoll(context.Background(), &gRPC.Commitment{Commitment: 1})
-	if err != nil {
-		log.Fatalf("could not greet: %v", err)
-	}
-	log.Println(responce)
-}
-
-
-func getTLSConfig() *tls.Config {
-	cert, err := tls.LoadX509KeyPair("keys/client_cert.pem", "keys/client_key.pem")
-	if err != nil {
-		log.Fatalf("failed to load client cert: %v", err)
-	}
-
-	ca := x509.NewCertPool()
-	caFilePath := "keys/ca_cert.pem"
-	caBytes, err := os.ReadFile(caFilePath)
-	if err != nil {
-		log.Fatalf("failed to read ca cert %q: %v", caFilePath, err)
-	}
-	if ok := ca.AppendCertsFromPEM(caBytes); !ok {
-		log.Fatalf("failed to parse %q", caFilePath)
-	}
-
-	return &tls.Config{
-		ServerName:   "x.test.example.com",
-		Certificates: []tls.Certificate{cert},
-		RootCAs:      ca,
+	for {
+		rollTheDice()
 	}
 }
+
+func rollTheDice() {
+	//commit to a roll
+	randomA, randomB := commitRoll()
+	//roll the dice
+	roll := ValidateRoll(randomA, randomB)
+
+	if roll == 0 {
+		log.Println("Roll was invalid")
+		return
+	}
+
+	log.Println("Roll was", roll)
+}
+
+func commitRoll() (int64, int64) {
+	randomA := rand.Int63()
+	commitment := sha1.New().Sum([]byte(fmt.Sprint(randomA)))
+
+	responce, err := server.CommitRoll(context.Background(), &gRPC.Commitment{Commitment: commitment[:]})
+	if err != nil {
+		log.Fatalf("could not commit roll: %v", err)
+	}
+	log.Println("Alice random:", randomA)
+	log.Println("Bob random:", responce.Random)
+
+	return randomA, responce.Random
+}
+
+func ValidateRoll(randomA int64, randomB int64) int64 {
+	responce, err := server.ValidateRoll(context.Background(), &gRPC.RollValidation{Random: randomA})
+	if err != nil {
+		log.Fatalln("could not validate roll: ", err)
+	}
+	if !responce.Valid {
+		return 0
+	}
+
+	return util.CalculateDiceRoll(randomA, randomB)
+}
+

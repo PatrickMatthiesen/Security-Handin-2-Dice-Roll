@@ -11,19 +11,18 @@ service DiceRollService
 }
 
 message Commitment {
-    int32 commitment = 1;
+    bytes commitment = 1;
 }
 
 message CommitmentResponse {
-    int32 random = 1;
+    int64 random = 1;
 }
 
 message RollValidation {
-    int32 commitment = 1;
-    int32 random = 2;
+    int64 random = 2;
 }
 
 message RollValidationResponse {
     bool valid = 1;
-    int32 roll = 2;
+    int64 roll = 2;
 }

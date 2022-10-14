@@ -1,14 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"context"
-	"crypto/tls"
-	"crypto/x509"
+	"crypto/sha1"
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"net"
-	"os"
+
+	"github.com/PatrickMatthiesen/DiceRoll/util"
 
 	// this has to be the same as the go.mod module,
 	// followed by the path to the folder the proto file is in.
@@ -23,8 +25,8 @@ type Server struct {
 	name                                    string // Not required but useful if you want to name your server
 	port                                    string // Not required but useful if your server needs to know what port it's listening to
 
-	randomA    int32
-	commitment int32
+	commitment []byte
+	randomB    int64
 }
 
 // flags are used to get arguments from the terminal. Flags take a value, a default value and a description of the flag.
@@ -36,9 +38,7 @@ func main() {
 	fmt.Println("--- Bob is waking up ---")
 	log.Printf("Bob attempts to create listener on port %s\n", *port)
 
-	// creds, _ := credentials.NewServerTLSFromFile("keys/server-cert.pem", "keys/server-key.pem")
-
-	creds := credentials.NewTLS(getTLSConfig())
+	creds := credentials.NewTLS(util.GetServerTLSConfig())
 
 	grpcServer := grpc.NewServer(grpc.Creds(creds))
 
@@ -50,8 +50,8 @@ func main() {
 	server := &Server{
 		port:       *port,
 		name:       "Bob",
-		randomA:    0,
-		commitment: 0,
+		randomB:    rand.Int63(),
+		commitment: nil,
 	}
 
 	gRPC.RegisterDiceRollServiceServer(grpcServer, server) //Registers the server to the gRPC server.
@@ -65,30 +65,36 @@ func main() {
 }
 
 func (s *Server) CommitRoll(cxt context.Context, req *gRPC.Commitment) (*gRPC.CommitmentResponse, error) {
-	log.Printf("Bob: Received commitment from Alice: %d\n", req.GetCommitment())
+	log.Println()
+	log.Println("Commitment from Alice: ", req.GetCommitment())
 	s.commitment = req.GetCommitment()
-	return &gRPC.CommitmentResponse{Random: 2}, nil
+
+	randomB := rand.Int63()
+	log.Println("Bob random: ", randomB)
+	s.randomB = randomB
+
+	return &gRPC.CommitmentResponse{Random: randomB}, nil
 }
 
-func getTLSConfig() *tls.Config {
-	cert, err := tls.LoadX509KeyPair("keys/server_cert.pem", "keys/server_key.pem")
-	if err != nil {
-		log.Fatalf("failed to load key pair: %s", err)
+func (s *Server) ValidateRoll(cxt context.Context, req *gRPC.RollValidation) (*gRPC.RollValidationResponse, error) {
+	randomA := req.GetRandom()
+	log.Println("Alice random:", randomA)
+
+	sum := sha1.New().Sum([]byte(fmt.Sprint(randomA)))
+
+	log.Println("Alice commitment:", s.commitment)
+	log.Println("Bob commitment:", sum)
+
+	if !bytes.Equal(s.commitment, sum) {
+		log.Println("Roll is invalid")
+		return &gRPC.RollValidationResponse{Valid: false}, nil
 	}
 
-	ca := x509.NewCertPool()
-	caFilePath := "keys/client_ca_cert.pem"
-	caBytes, err := os.ReadFile(caFilePath)
-	if err != nil {
-		log.Fatalf("failed to read ca cert %q: %v", caFilePath, err)
-	}
-	if ok := ca.AppendCertsFromPEM(caBytes); !ok {
-		log.Fatalf("failed to parse %q", caFilePath)
-	}
+	log.Println("Bob random cal:", s.randomB)
+	roll := util.CalculateDiceRoll(randomA, s.randomB)
 
-	return &tls.Config{
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-		Certificates: []tls.Certificate{cert},
-		ClientCAs:    ca,
-	}
+	log.Println("Bob: Roll is valid, sending result to Alice")
+	log.Println("Bob: Roll is", roll)
+
+	return &gRPC.RollValidationResponse{Valid: true, Roll: roll}, nil
 }
