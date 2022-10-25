@@ -3,7 +3,7 @@ package main
 import (
 	// "crypto/tls"
 	"context"
-	"crypto/sha1"
+	"crypto/sha256"
 	"flag"
 	"fmt"
 	"log"
@@ -77,7 +77,7 @@ func rollTheDice() {
 
 func commitRoll() (int64, int64) {
 	randomA := rand.Int63()
-	commitment := sha1.New().Sum([]byte(fmt.Sprint(randomA)))
+	commitment := sha256.New().Sum([]byte(fmt.Sprint(randomA)))
 
 	responce, err := server.CommitRoll(context.Background(), &gRPC.Commitment{Commitment: commitment[:]})
 	if err != nil {

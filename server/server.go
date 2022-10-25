@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/sha1"
+	"crypto/sha256"
 	"flag"
 	"fmt"
 	"log"
@@ -80,7 +80,7 @@ func (s *Server) ValidateRoll(cxt context.Context, req *gRPC.RollValidation) (*g
 	randomA := req.GetRandom()
 	log.Println("Alice random:", randomA)
 
-	sum := sha1.New().Sum([]byte(fmt.Sprint(randomA)))
+	sum := sha256.New().Sum([]byte(fmt.Sprint(randomA)))
 
 	log.Println("Alice commitment:", s.commitment)
 	log.Println("Bob commitment:", sum)
