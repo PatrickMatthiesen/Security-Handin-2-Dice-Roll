@@ -1,16 +1,21 @@
-# Security-Handin-2-Dice-Roll
+# Security Hand-in 2 Dice Roll
 
 To create keys, in the terminal run:
+
 ```sh
 cd keys && bash create.sh && cd ..
 ```
 
-Then run the server (bob):
+Then run the server (Bob):
+
 ```sh
 go run .\server\
 ```
 
-And run the client (alice):
+And run the client (Alice):
+
 ```sh
 go run .\client\
 ```
+
+Watch the rolls roll. 👀
