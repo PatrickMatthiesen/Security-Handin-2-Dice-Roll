@@ -1,6 +1,6 @@
 # Security Hand-in 2 Dice Roll
 
-To create keys, in the terminal run:
+To create keys, in the terminal run the command:
 
 ```sh
 cd keys && bash create.sh && cd ..
