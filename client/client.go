@@ -11,7 +11,7 @@ import (
 
 	// "encoding/pem"
 
-	gRPC "github.com/PatrickMatthiesen/DiceRoll/proto"
+	gRPC "github.com/PatrickMatthiesen/DiceRoll/Proto"
 	"github.com/PatrickMatthiesen/DiceRoll/util"
 
 	"google.golang.org/grpc"
@@ -100,4 +100,3 @@ func ValidateRoll(randomA int64, randomB int64) int64 {
 
 	return util.CalculateDiceRoll(randomA, randomB)
 }
-
